@@ -9,6 +9,14 @@ import org.hibernate.annotations.Check;
 
 import java.util.Collection;
 
+
+/**
+ * модель животоного для приюта
+ * поле <b>kind</b> можно заполнить значениями ("dog", "cat")
+ * с другими значениями класс не работает
+ * класс связан с {@link Shelters} с помошью связи {@link ManyToOne} и с классом
+ * {@link Habit} с помошью  связи {@link OneToMany}
+ */
 @Check(constraints = "kind in ('cat', 'dog')")
 @Getter
 @Setter
@@ -19,15 +27,20 @@ public class Animal {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
+    // цвет животного
     private String color;
 
+    // описание животного
     private String description;
 
+
+    // вид животного только cat или dog
     @Column(nullable = false)
     private String kind;
 
     @ManyToOne
-    @JoinColumn(name = "shelters_id", nullable = false)
+    @JsonIgnore
+    @JoinColumn(name = "shelters_id")
     private Shelters shelters;
 
     @OneToMany(mappedBy = "animal")

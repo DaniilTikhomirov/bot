@@ -1,10 +1,18 @@
 package com.telegram.bot.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Модель расписания для приютов.
+ * Поля <b>monday</b>, <b>tuesday</b>, <b>wednesday</b>, <b>thursday</b>, <b>friday</b>, <b>saturday</b>, <b>sunday</b>
+ * содержат расписание работы приюта по дням недели.
+ * Класс связан с {@link Shelters} через связь {@link OneToOne},
+ * где каждое расписание соответствует одному приюту.
+ */
 
 @Getter
 @Setter
@@ -16,7 +24,8 @@ public class Schedules {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    @OneToOne
+    @OneToOne(mappedBy = "schedules")
+    @JsonIgnore
     private Shelters shelters;
 
     private String monday;
