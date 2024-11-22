@@ -6,6 +6,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 
+/**
+ * Сервис для управления животными в системе приюта.
+ *
+ * <p>Содержит методы для добавления и получения информации о животных.</p>
+ * <p>
+ * Связан с репозиторием {@link AnimalRepository} для взаимодействия с базой данных
+ */
 @Service
 public class AnimalService {
 
