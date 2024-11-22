@@ -65,3 +65,6 @@ CREATE TABLE habits(
 ALTER TABLE animals ADD FOREIGN KEY (shelters_id) REFERENCES shelters(id);
 ALTER TABLE habits ADD FOREIGN KEY (animal_id) REFERENCES animals(id);
 
+-- changeset danil:v0-2-4
+ALTER TABLE animals ALTER COLUMN shelters_id DROP NOT NULL;
+
