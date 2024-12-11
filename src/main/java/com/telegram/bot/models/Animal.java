@@ -6,6 +6,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.Fetch;
 
 import java.util.Collection;
 

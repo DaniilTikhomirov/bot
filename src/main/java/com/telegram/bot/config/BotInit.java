@@ -28,6 +28,7 @@ public class BotInit {
         try {
             TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
             telegramBotsApi.registerBot(bot);
+            bot.setConfig();
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
             throw new RuntimeException(e);

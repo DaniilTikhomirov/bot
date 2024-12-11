@@ -29,4 +29,8 @@ public class AnimalService {
     public Collection<Animal> getAllAnimals() {
         return animalRepository.findAll();
     }
+
+    public Animal getAnimalById(long id) {
+        return animalRepository.findById(id).orElse(null);
+    }
 }

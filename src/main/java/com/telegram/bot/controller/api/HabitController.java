@@ -1,6 +1,5 @@
 package com.telegram.bot.controller.api;
 
-import com.telegram.bot.models.Animal;
 import com.telegram.bot.models.Habit;
 import com.telegram.bot.services.HabitService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,7 +7,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

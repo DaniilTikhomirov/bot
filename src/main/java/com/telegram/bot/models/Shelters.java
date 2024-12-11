@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.Check;
 
 import java.util.Collection;
@@ -25,41 +26,37 @@ import java.util.Collection;
 @Getter
 @Setter
 @EqualsAndHashCode(of = {"id"})
-@Check(constraints = "kind IN ('cat', 'dog')")
 @Entity(name = "shelters")
+@ToString
 public class Shelters {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    // название приюта
     @Column(nullable = false)
     private String name;
 
-    // описание приюта
     private String description;
-
-    // контакты охраны
     private String securityContact;
-
-    // рекомендации по входу
     private String safetyRecommendation;
-
-    // контакты
     private String contact;
 
-    @OneToMany(mappedBy = "shelters")
+    @OneToMany(mappedBy = "shelters", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private Collection<Animal> animals;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "shelters")
+    @OneToMany(mappedBy = "shelters", fetch = FetchType.EAGER)
     private Collection<Volunteers> volunteers;
 
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "schedule_id")
     private Schedules schedules;
 
-    // вид приюты cat или dog
+    @ManyToMany(mappedBy = "shelters", fetch = FetchType.EAGER)
+    @JsonIgnore
+    @ToString.Exclude
+    private Collection<OwnerShelters> ownerShelters;
+
     private String kind;
 }
