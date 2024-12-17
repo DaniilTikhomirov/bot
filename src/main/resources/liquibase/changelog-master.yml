@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: liquibase/scripts/v0/create-tables.sql
+  - include:
+      file: liquibase/scripts/v1/create-admins-and-owners.sql
+  - include:
+      file: liquibase/scripts/v2/create-users.sql
