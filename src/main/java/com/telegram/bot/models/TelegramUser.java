@@ -1,5 +1,6 @@
 package com.telegram.bot.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,5 +20,10 @@ public class TelegramUser {
 
     @Column(columnDefinition = "int default 0")
     private int warningCounter;
+
+    @ManyToOne
+    @JsonIgnore
+    @JoinColumn(name = "volunteers_telegram_id", unique = true, referencedColumnName = "telegram_id")
+    private Volunteers volunteer;
 
 }

@@ -29,4 +29,16 @@ public class VolunteersService {
     public Collection<Volunteers> getAllVolunteers() {
         return volunteersRepository.findAll();
     }
+
+    public Volunteers getVolunteerByTelegramId(long telegramId) {
+        return volunteersRepository.findVolunteersByTelegramId(telegramId).orElse(null);
+    }
+
+    public boolean isVolunteer(long telegramId) {
+        return getVolunteerByTelegramId(telegramId) != null;
+    }
+
+    public Volunteers getVolunteerById(long id) {
+        return volunteersRepository.findById(id).orElse(null);
+    }
 }

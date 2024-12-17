@@ -1,13 +1,12 @@
 package com.telegram.bot.received;
 
 import com.telegram.bot.markUps.MarkupsForInfo;
-import com.telegram.bot.models.Animal;
-import com.telegram.bot.models.OwnerShelters;
-import com.telegram.bot.models.Shelters;
+import com.telegram.bot.models.*;
 import com.telegram.bot.services.AnimalService;
 import com.telegram.bot.services.PhotoManagerService;
 import com.telegram.bot.services.SheltersService;
-import com.telegram.bot.states.UserStateRegisterOwner;
+import com.telegram.bot.services.TelegramUsersService;
+import com.telegram.bot.states.UserState;
 import com.telegram.bot.telegram_utils.MessageProvider;
 import com.telegram.bot.telegram_utils.StatesStorage;
 import lombok.Getter;
@@ -28,13 +27,15 @@ public class TelegramUsers {
     private final SheltersService sheltersService;
     private final PhotoManagerService photoManagerService;
     private final AnimalService animalService;
+    private final TelegramUsersService telegramUsersService;
 
-    public TelegramUsers(StatesStorage statesStorage, MessageProvider messageProvider, SheltersService sheltersService, PhotoManagerService photoManagerService, AnimalService animalService) {
+    public TelegramUsers(StatesStorage statesStorage, MessageProvider messageProvider, SheltersService sheltersService, PhotoManagerService photoManagerService, AnimalService animalService, TelegramUsersService telegramUsersService) {
         this.statesStorage = statesStorage;
         this.messageProvider = messageProvider;
         this.sheltersService = sheltersService;
         this.photoManagerService = photoManagerService;
         this.animalService = animalService;
+        this.telegramUsersService = telegramUsersService;
     }
 
     /**
@@ -54,7 +55,7 @@ public class TelegramUsers {
         if (!message.startsWith("/")) {
 
 
-            if (statesStorage.getUserStates().get(chatId) == UserStateRegisterOwner.registrationOwner) {
+            if (statesStorage.getUserStates().get(chatId) == UserState.registrationOwner) {
 
                 OwnerShelters ownerShelters = new OwnerShelters();
                 ownerShelters.setName(message);
@@ -62,20 +63,20 @@ public class TelegramUsers {
                 statesStorage.registrationDataOwnerPut(chatId, ownerShelters);
                 messageProvider.PutMessage(chatId, "расскажите о себе о вашем приюте прикрепите " +
                         "ссылки если они есть чтобы администратор вас одобрил");
-                statesStorage.UserStatesPut(chatId, UserStateRegisterOwner.registrationOwnerName);
+                statesStorage.UserStatesPut(chatId, UserState.registrationOwnerName);
 
-            } else if (statesStorage.getUserStates().get(chatId) == UserStateRegisterOwner.registrationOwnerName) {
+            } else if (statesStorage.getUserStates().get(chatId) == UserState.registrationOwnerName) {
                 String send = "имя: " + statesStorage.getRegistrationDataOwner().get(chatId).getName() +
                         "\n" + "описание: " + message;
                 messageProvider.SendRegistrationToAdministrators(chatId, send, "reject", "accept");
                 messageProvider.PutMessage(chatId, "сообщение было отправлено администраторам ожидайте ответа");
-                statesStorage.UserStatesPut(chatId, UserStateRegisterOwner.registrationOwnerWait);
+                statesStorage.UserStatesPut(chatId, UserState.registrationOwnerWait);
 
-            } else if (statesStorage.getUserStates().get(chatId) == UserStateRegisterOwner.registrationOwnerAccepted ||
-                    statesStorage.getUserStates().get(chatId) == UserStateRegisterOwner.registrationOwnerDenied) {
+            } else if (statesStorage.getUserStates().get(chatId) == UserState.registrationOwnerAccepted ||
+                    statesStorage.getUserStates().get(chatId) == UserState.registrationOwnerDenied) {
                 statesStorage.getUserStates().remove(chatId);
 
-            } else if (statesStorage.getUserStates().get(chatId) == UserStateRegisterOwner.registrationOwnerWait) {
+            } else if (statesStorage.getUserStates().get(chatId) == UserState.registrationOwnerWait) {
                 messageProvider.PutMessage(chatId, "Пожалуйста ожидайте ответа администратора");
             }
         }
@@ -85,7 +86,7 @@ public class TelegramUsers {
         switch (call_split_data[0]) {
             case "info_on_shelter_user" -> {
                 List<Animal> animals = sheltersService.getPageAnimals(page, size,
-                        Long.parseLong(call_split_data[2]));
+                        Long.parseLong(call_split_data[2]), true);
                 messageProvider.delMessage(chat_id, messageId);
                 messageProvider.PutMessageWithMarkUp(chat_id, "Животные приюта",
                         MarkupsForInfo.getAnimalsUser(chat_id, messageId, page,
@@ -93,7 +94,7 @@ public class TelegramUsers {
 
             }case "back_from_animals" -> {
                 List<Animal> animals = sheltersService.getPageAnimals(page, size,
-                        Long.parseLong(call_split_data[2]));
+                        Long.parseLong(call_split_data[2]), true);
                 for(int mesId : statesStorage.getPhotosForDelete().get(chat_id)) {
                     try {
                         messageProvider.delMessage(chat_id, mesId);
@@ -134,8 +135,35 @@ public class TelegramUsers {
 
                 messageProvider.PutMessageWithMarkUp(chat_id, "Информация:\nцвет: " + animal.getColor() +
                         "\n" + "описание: " + animal.getDescription(), MarkupsForInfo.photoBack(chat_id,
-                        Long.parseLong(call_split_data[3])));
+                        Long.parseLong(call_split_data[3]), "back_from_animals"));
 
+            }
+
+            case "acceptUs" -> {
+                TelegramUser telegramUser = telegramUsersService.getByTgIdTelegramUser(chat_id);
+                Volunteers volunteers = statesStorage.getVolunteersForPutAnimal()
+                        .get(Long.parseLong(call_split_data[1]));
+
+                Animal animal = statesStorage.getAnimalsForPut().get(Long.parseLong(call_split_data[1]));
+
+                animal.setReview(true);
+
+                System.out.println(volunteers.getTelegramId());
+
+                telegramUser.setVolunteer(volunteers);
+
+                telegramUsersService.addTelegramUsers(telegramUser);
+
+                animalService.addAnimal(animal);
+
+                messageProvider.delMessage(chat_id, messageId);
+
+                messageProvider.PutMessage(Long.parseLong(call_split_data[1]), "Питомец назначен!");
+            }
+            case "rejectUs" -> {
+                messageProvider.delMessage(chat_id, messageId);
+
+                messageProvider.PutMessage(Long.parseLong(call_split_data[1]), "Пользователь отклонил запрос");
             }
         }
     }

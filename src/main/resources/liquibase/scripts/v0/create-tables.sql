@@ -68,3 +68,12 @@ ALTER TABLE habits ADD FOREIGN KEY (animal_id) REFERENCES animals(id);
 -- changeset danil:v0-2-4
 ALTER TABLE animals ALTER COLUMN shelters_id DROP NOT NULL;
 
+-- changeset danil:v0-3-0
+ALTER TABLE volunteers ADD COLUMN telegram_id bigint UNIQUE;
+
+-- changeset danil:v0-3-1
+ALTER TABLE animals ADD COLUMN review boolean DEFAULT FALSE;
+
+
+
+

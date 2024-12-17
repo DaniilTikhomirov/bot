@@ -247,14 +247,14 @@ public class MarkupsForInfo {
         return inlineKeyboardMarkup;
     }
 
-    public static InlineKeyboardMarkup photoBack(long chat_id, long shelter_id) {
+    public static InlineKeyboardMarkup photoBack(long chat_id, long shelter_id, String callBack) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInlineKeyboardButtons = new ArrayList<>();
         List<InlineKeyboardButton> rowInline = new ArrayList<>();
 
         InlineKeyboardButton back = new InlineKeyboardButton();
         back.setText("Назад");
-        back.setCallbackData("back_from_animals " + chat_id + " " + shelter_id);
+        back.setCallbackData(callBack + " " + chat_id + " " + shelter_id);
 
         rowInline.add(back);
         rowsInlineKeyboardButtons.add(rowInline);

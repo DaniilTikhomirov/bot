@@ -25,3 +25,5 @@ CREATE TABLE owners_many_to_many_shelters(
 -- changeset danil:v1-2-3
 ALTER TABLE owners_many_to_many_shelters ADD FOREIGN KEY (shelters_id) REFERENCES shelters(id);
 ALTER TABLE owners_many_to_many_shelters ADD FOREIGN KEY (owners_shelters_id) REFERENCES owners_shelters(id);
+
+

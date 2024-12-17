@@ -9,6 +9,7 @@ import org.hibernate.annotations.Check;
 import org.hibernate.annotations.Fetch;
 
 import java.util.Collection;
+import java.util.List;
 
 
 /**
@@ -34,6 +35,8 @@ public class Animal {
     // описание животного
     private String description;
 
+    @Column(columnDefinition = "boolean default FALSE")
+    private boolean review;
 
     // вид животного только cat или dog
     @Column(nullable = false)

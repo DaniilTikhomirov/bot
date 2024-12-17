@@ -33,4 +33,13 @@ public class OwnerShelters {
             inverseJoinColumns = {@JoinColumn(name = "shelters_id")})
     @ToString.Exclude
     private Collection<Shelters> shelters;
+
+    public long countAnimals(){
+        long count = 0;
+        for (Shelters shelter : shelters) {
+            count += shelter.getAnimals().size();
+        }
+
+        return count;
+    }
 }

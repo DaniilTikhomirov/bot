@@ -2,14 +2,19 @@ package com.telegram.bot.callBack;
 
 import com.telegram.bot.markUps.MarkupsForInfo;
 import com.telegram.bot.markUps.MarkupsForOwners;
+import com.telegram.bot.markUps.MarkupsForSearch;
 import com.telegram.bot.models.Animal;
 import com.telegram.bot.models.Shelters;
+import com.telegram.bot.models.Volunteers;
 import com.telegram.bot.received.TelegramAdmins;
 import com.telegram.bot.received.TelegramOwners;
 import com.telegram.bot.received.TelegramUsers;
+import com.telegram.bot.received.TelegramVolunteers;
 import com.telegram.bot.services.OwnerSheltersService;
 import com.telegram.bot.services.SheltersService;
 import com.telegram.bot.telegram_utils.MessageProvider;
+import com.telegram.bot.telegram_utils.ModelsHelper;
+import com.telegram.bot.telegram_utils.StatesStorage;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -26,13 +31,15 @@ public class CallBack {
     private final MessageProvider messageProvider;
     private final SheltersService sheltersService;
     private final TelegramUsers telegramUsers;
+    private final StatesStorage statesStorage;
+    private final TelegramVolunteers telegramVolunteers;
 
 
     public CallBack(TelegramAdmins telegramAdmins,
                     TelegramOwners telegramOwners,
                     OwnerSheltersService ownerSheltersService,
                     MarkupsForOwners markupsForOwners,
-                    MessageProvider messageProvider, SheltersService sheltersService, TelegramUsers telegramUsers) {
+                    MessageProvider messageProvider, SheltersService sheltersService, TelegramUsers telegramUsers, StatesStorage statesStorage, TelegramVolunteers telegramVolunteers) {
         this.telegramAdmins = telegramAdmins;
         this.telegramOwners = telegramOwners;
         this.ownerSheltersService = ownerSheltersService;
@@ -40,6 +47,8 @@ public class CallBack {
         this.messageProvider = messageProvider;
         this.sheltersService = sheltersService;
         this.telegramUsers = telegramUsers;
+        this.statesStorage = statesStorage;
+        this.telegramVolunteers = telegramVolunteers;
     }
 
 
@@ -57,6 +66,7 @@ public class CallBack {
             telegramAdmins.administratorCallBack(chat_id, call_split_data);
             telegramOwners.ownerCallBack(chat_id, call_split_data, messageId, page, size);
             telegramUsers.userCallBack(chat_id, call_split_data, messageId, page, size);
+            telegramVolunteers.volunteersCallBack(chat_id, call_split_data, messageId, page, size);
         } else if (call_split_data.length == 2) {
             telegramOwners.ownerCallBack(chat_id, call_split_data, messageId, page, size);
         } else if (call_split_data.length >= 4) {
@@ -82,7 +92,7 @@ public class CallBack {
                     if (shelters.isEmpty()) {
                         return;
                     }
-                    messageProvider.changeInline(chat_id, messageId, markupsForOwners.allShelters(chat_id, messageId, page, shelters));
+                    messageProvider.changeInline(chat_id, messageId, MarkupsForOwners.allShelters(chat_id, messageId, page, shelters));
                 }
                 case "next_info_shelter", "prev_info_shelter" -> {
                     List<Shelters> shelters = ownerSheltersService.getPageShelters(page, size, chat_id);
@@ -94,7 +104,8 @@ public class CallBack {
                             MarkupsForInfo.getInfoShelters(chat_id, messageId, page, shelters));
                 }
                 case "next_info_animal", "prev_info_animal" -> {
-                    List<Animal> animals = sheltersService.getPageAnimals(page, size, Long.parseLong(call_split_data[4]));
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size, Long.parseLong(call_split_data[4]),
+                            true);
                     if (animals.isEmpty()) {
                         return;
                     }
@@ -115,13 +126,51 @@ public class CallBack {
                                     page, shelters, false));
                 }
                 case "next_info_animal_user", "prev_info_animal_user" -> {
-                    List<Animal> animals = sheltersService.getPageAnimals(page, size, Long.parseLong(call_split_data[4]));
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size, Long.parseLong(call_split_data[4]),
+                            true);
                     if (animals.isEmpty()) {
                         return;
                     }
 
                     messageProvider.changeInline(chat_id, messageId,
                             MarkupsForInfo.getAnimalsUser(chat_id, messageId, page, animals,
+                                    Long.parseLong(call_split_data[4])));
+
+                }case "next_search_shelter", "prev_search_shelter" -> {
+                    List<Shelters> shelters = statesStorage.getSheltersForSearch().get(chat_id);
+                    List<Shelters> sheltersPage = ModelsHelper.getPage(page, size, shelters);
+
+
+                    if (sheltersPage.isEmpty()) {
+                        return;
+                    }
+
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForSearch.searchShelter(chat_id, messageId, page, sheltersPage));
+
+                }case "next_animal_put_animal", "prev_animal_put_animal" -> {
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size,
+                            Long.parseLong(call_split_data[4]), true);
+
+                    if (animals.isEmpty()){
+                        return;
+                    }
+
+
+                    messageProvider.changeInline(chat_id, messageId, MarkupsForOwners.allAnimalsForPutAnimal(chat_id,
+                            messageId, page, animals, Long.parseLong(call_split_data[4])));
+                }case "next_volunteer_put_animal", "prev_volunteer_put_animal" -> {
+                    List<Volunteers> volunteers = sheltersService.
+                            getShelterById(Long.parseLong(call_split_data[4])).getVolunteers().stream().toList();
+
+                    List<Volunteers> volunteersPage = ModelsHelper.getPage(page, size, volunteers);
+
+                    if (volunteersPage.isEmpty()) {
+                        return;
+                    }
+
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForOwners.VolunteersForPutAnimal(chat_id, messageId, page, volunteersPage,
                                     Long.parseLong(call_split_data[4])));
                 }
             }

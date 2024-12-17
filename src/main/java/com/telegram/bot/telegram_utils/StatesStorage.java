@@ -3,12 +3,12 @@ package com.telegram.bot.telegram_utils;
 import com.telegram.bot.models.Animal;
 import com.telegram.bot.models.OwnerShelters;
 import com.telegram.bot.models.Shelters;
+import com.telegram.bot.models.Volunteers;
 import com.telegram.bot.states.AdministratorStates;
 import com.telegram.bot.states.OwnersStates;
-import com.telegram.bot.states.UserStateRegisterOwner;
+import com.telegram.bot.states.UserState;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Getter
 public class StatesStorage {
 
-    private final Map<Long, UserStateRegisterOwner> userStates;
+    private final Map<Long, UserState> userStates;
 
     private final Map<Long, OwnerShelters> registrationDataOwner;
 
@@ -27,9 +27,13 @@ public class StatesStorage {
 
     private final Map<Integer, Map<Long, Integer>> delMessages;
 
+    private final Map<Integer, Map<Long, Integer>> delMessagesVolunteers;
+
     private final Map<Long, OwnersStates> ownerStates;
 
     private final Map<Long, Long> administratorRejectedID;
+
+    private final Map<Long, Long> volunteerRejectedID;
 
     private final Map<Long, Animal> ownerRegisterAnimals;
 
@@ -37,7 +41,19 @@ public class StatesStorage {
 
     private final Map<Long, List<Integer>> photosForDelete;
 
+    private final Map<Long, Volunteers> registrationDataVolunteers;
+
+    private final Map<Long, Integer> searchMessageId;
+
+    private final Map<Long, List<Shelters>> sheltersForSearch;
+
+    private final Map<Long, Volunteers> volunteersForPutAnimal;
+
+    private final Map<Long, Animal> animalsForPut;
+
     private int counterForDelMessage = 0;
+
+    private int counterForDelMessagesVolunteer = 0;
 
     public StatesStorage() {
         userStates = new ConcurrentHashMap<>();
@@ -49,20 +65,36 @@ public class StatesStorage {
         ownerRegisterAnimals = new ConcurrentHashMap<>();
         ownerRegisterShelters = new ConcurrentHashMap<>();
         photosForDelete = new ConcurrentHashMap<>();
+        registrationDataVolunteers = new ConcurrentHashMap<>();
+        searchMessageId = new ConcurrentHashMap<>();
+        sheltersForSearch = new ConcurrentHashMap<>();
+        delMessagesVolunteers = new ConcurrentHashMap<>();
+        volunteerRejectedID = new ConcurrentHashMap<>();
+        volunteersForPutAnimal = new ConcurrentHashMap<>();
+        animalsForPut = new ConcurrentHashMap<>();
     }
 
     public void incrementDelMessage(){
         counterForDelMessage++;
     }
 
+    public void incrementDelMessagesVolunteer(){
+        counterForDelMessagesVolunteer++;
+    }
+
+
     public void removeChatId(long chatId) {
-        userStates.remove(chatId);
+        if(userStates.get(chatId) != UserState.WAIT_ANIMAL_ACCEPTED) {
+            userStates.remove(chatId);
+        }
         registrationDataOwner.remove(chatId);
         administratorStates.remove(chatId);
         ownerStates.remove(chatId);
+        registrationDataVolunteers.remove(chatId);
+        volunteersForPutAnimal.remove(chatId);
     }
 
-    public void UserStatesPut(Long chatId, UserStateRegisterOwner userStateRegisterOwner) {
+    public void UserStatesPut(Long chatId, UserState userStateRegisterOwner) {
         userStates.put(chatId, userStateRegisterOwner);
         System.out.println(userStates.toString());
     }
@@ -96,6 +128,10 @@ public class StatesStorage {
         this.delMessages.put(messageId, delMessages);
     }
 
+    public void delMessagesVolunteersPut(Integer messageId, Map<Long, Integer> delMessagesVolunteers) {
+        this.delMessagesVolunteers.put(messageId, delMessagesVolunteers);
+    }
+
     public void ownerRegisterAnimalsPut(Long chatId, Animal animal) {
         ownerRegisterAnimals.put(chatId, animal);
     }
@@ -103,4 +139,25 @@ public class StatesStorage {
     public void ownerRegisterSheltersPut(Long chatId, Shelters shelters) {
         ownerRegisterShelters.put(chatId, shelters);
     }
+
+    public void registrationDataVolunteersPut(long chatId, Volunteers volunteers) {
+        registrationDataVolunteers.put(chatId, volunteers);
+    }
+
+    public void searchMessageIdPut(Long chatId, Integer messageId) {
+        searchMessageId.put(chatId, messageId);
+    }
+
+    public void sheltersForSearchPut(Long chatId, List<Shelters> shelters){
+        sheltersForSearch.put(chatId, shelters);
+    }
+
+    public void volunteersForPutAnimalPut(Long chatId, Volunteers volunteers) {
+        volunteersForPutAnimal.put(chatId, volunteers);
+    }
+
+    public void animalForPutPut(Long chatId, Animal animal){
+        animalsForPut.put(chatId, animal);
+    }
+
 }

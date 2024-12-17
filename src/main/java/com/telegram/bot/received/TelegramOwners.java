@@ -1,20 +1,17 @@
 package com.telegram.bot.received;
 
+import com.telegram.bot.markUps.MarkupsForAdmins;
 import com.telegram.bot.markUps.MarkupsForInfo;
 import com.telegram.bot.markUps.MarkupsForOwners;
-import com.telegram.bot.models.Animal;
-import com.telegram.bot.models.OwnerShelters;
-import com.telegram.bot.models.Schedules;
-import com.telegram.bot.models.Shelters;
-import com.telegram.bot.services.AnimalService;
-import com.telegram.bot.services.OwnerSheltersService;
-import com.telegram.bot.services.SchedulesService;
-import com.telegram.bot.services.SheltersService;
+import com.telegram.bot.models.*;
+import com.telegram.bot.services.*;
 import com.telegram.bot.states.OwnersStates;
 import com.telegram.bot.telegram_utils.MessageProvider;
+import com.telegram.bot.telegram_utils.ModelsHelper;
 import com.telegram.bot.telegram_utils.StatesStorage;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,9 +23,11 @@ public class TelegramOwners {
     private final StatesStorage statesStorage;
     private final MessageProvider messageProvider;
     private final SchedulesService schedulesService;
-    private final MarkupsForOwners markupsForOwners;
     private final SheltersService sheltersService;
     private final AnimalService animalService;
+    private final VolunteersService volunteersService;
+    private final PhotoManagerService photoManagerService;
+    private final TelegramUsersService telegramUsersService;
 
     public TelegramOwners(OwnerSheltersService ownerSheltersService,
                           StatesStorage statesStorage,
@@ -36,14 +35,16 @@ public class TelegramOwners {
                           SchedulesService schedulesService,
                           MarkupsForOwners markupsForOwners,
                           SheltersService sheltersService,
-                          AnimalService animalService) {
+                          AnimalService animalService, VolunteersService volunteersService, PhotoManagerService photoManagerService, TelegramUsersService telegramUsersService) {
         this.ownerSheltersService = ownerSheltersService;
         this.statesStorage = statesStorage;
         this.messageProvider = messageProvider;
         this.schedulesService = schedulesService;
-        this.markupsForOwners = markupsForOwners;
         this.sheltersService = sheltersService;
         this.animalService = animalService;
+        this.volunteersService = volunteersService;
+        this.photoManagerService = photoManagerService;
+        this.telegramUsersService = telegramUsersService;
     }
 
 
@@ -63,10 +64,23 @@ public class TelegramOwners {
                 case REGISTRATION_SHELTERS_WAIT -> messageProvider.PutMessage(chatId, "Дождитесь ответа администратора");
                 case REGISTRATION_ANIMAL_DESCRIPTION -> handleRegisterAnimalDescription(chatId, message);
                 case REGISTRATION_ANIMAL_COLOR -> handleRegisterAnimalColor(chatId, message);
-
-
+                case REJECT_VOLUNTEER -> {messageProvider.PutMessage(statesStorage.getVolunteerRejectedID().get(chatId),
+                        "вам отказали по причине: " + message);}
+                case GET_CHAT_ID_PUT_MESSAGE -> handlePutAnimal(chatId, message);
             }
         }
+    }
+
+    private void handlePutAnimal(long chatId, String message) {
+        long userID = Long.parseLong(message);
+        TelegramUser telegramUser = telegramUsersService.getByTgIdTelegramUser(userID);
+        if(telegramUser == null) {
+            messageProvider.PutMessage(chatId, "такого пользователя не существует попробуйте еще раз");
+            return;
+        }
+
+        messageProvider.PutMessageWithMarkUp(userID, "Потвердите что вы хотите взять животное",
+                MarkupsForAdmins.rejectAcceptMarkUp(chatId, 1, "rejectUs", "acceptUs"));
     }
 
     private void handleRegisterName(long chatId, String message) {
@@ -129,7 +143,7 @@ public class TelegramOwners {
             statesStorage.registrationDataOwnerPut(chatId, ownerShelters);
             statesStorage.getOwnerStates().put(chatId, OwnersStates.REGISTRATION_SHELTERS_KIND);
             messageProvider.PutMessageWithMarkUp(chatId, "укажите тип приюта cat или dog",
-                    markupsForOwners.variantsForKind(chatId));
+                    MarkupsForOwners.variantsForKind(chatId));
         } else {
             messageProvider.PutMessage(chatId, "не правильно введены данные попробуйте еще раз");
         }
@@ -238,7 +252,7 @@ public class TelegramOwners {
         statesStorage.ownerStatesPut(chatId, OwnersStates.REGISTRATION_ANIMAL_PHOTO);
 
         messageProvider.PutMessageWithMarkUp(chatId, "отправьте фотографии",
-                markupsForOwners.acceptPhoto());
+                MarkupsForOwners.acceptPhoto());
     }
 
     public void ownerCallBack(long chat_id, String[] call_split_data, int messageId, int page, int size) {
@@ -261,8 +275,97 @@ public class TelegramOwners {
                     }
                     messageProvider.delMessage(chat_id, messageId);
                     messageProvider.PutMessageWithMarkUp(chat_id, "выберете приют",
-                            markupsForOwners.allShelters(chat_id, messageId, page, shelters));
+                            MarkupsForOwners.allShelters(chat_id, messageId, page, shelters));
                 }
+
+                case "put_animal", "back_animal_put_animal" -> {
+                    List<Shelters> shelters = ownerSheltersService.getPageShelters(page, size, chat_id);
+                    messageProvider.changeText(chat_id, messageId, "выберете приют из которого заберают животное");
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForOwners.allSheltersForPutAnimal(chat_id, messageId, page, shelters));
+
+                }
+
+                case "click_on_shelter_put_animal" -> {
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size,
+                            Long.parseLong(call_split_data[2]), true);
+                    messageProvider.changeText(chat_id,messageId, "Выберете животное");
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForOwners.allAnimalsForPutAnimal(chat_id, messageId, 1, animals,
+                                    Long.parseLong(call_split_data[2])));
+
+                }
+
+                case "back_volunteer_put_animal" -> {
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size,
+                            Long.parseLong(call_split_data[3]), true);
+                    messageProvider.changeText(chat_id,messageId, "Выберете животное");
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForOwners.allAnimalsForPutAnimal(chat_id, messageId, 1, animals,
+                                    Long.parseLong(call_split_data[3])));
+                }
+
+                case "click_on_volunteer_put_animal" -> {
+                    statesStorage.ownerStatesPut(chat_id, OwnersStates.GET_CHAT_ID_PUT_MESSAGE);
+                    statesStorage.volunteersForPutAnimalPut(chat_id,
+                            volunteersService.getVolunteerById(Long.parseLong(call_split_data[2])));
+                    messageProvider.PutMessage(chat_id, "напишите id пользователя, который забирает животное");
+                }
+
+                case "click_on_animal_put_animal" -> {
+                    List<Volunteers> volunteers = sheltersService.
+                            getShelterById(Long.parseLong(call_split_data[3])).getVolunteers().stream().toList();
+
+                    List<Volunteers> volunteersPage = ModelsHelper.getPage(page, size, volunteers);
+                    Animal animal = animalService.getAnimalById(Long.parseLong(call_split_data[2]));
+
+                    statesStorage.animalForPutPut(chat_id, animal);
+
+                    messageProvider.changeText(chat_id, messageId, "Выберете волонтера");
+
+                    messageProvider.changeInline(chat_id, messageId,MarkupsForOwners.VolunteersForPutAnimal(chat_id, messageId, page, volunteersPage,
+                            Long.parseLong(call_split_data[3])));
+                }
+
+                case "info_about_animal" -> {
+                    Animal animal = animalService.getAnimalById(Long.parseLong(call_split_data[2]));
+                    if (animal == null) {
+                        messageProvider.PutMessage(chat_id,"возникла ошибка /start");
+                        return;
+                    }
+
+                    try {
+                        photoManagerService.sendPhoto(chat_id, call_split_data[3],
+                                call_split_data[2], "data");
+                    }catch (IOException e){
+                        e.printStackTrace();
+                    }
+
+                    messageProvider.delMessage(chat_id, messageId);
+
+                    messageProvider.PutMessageWithMarkUp(chat_id, "Информация:\nцвет: " + animal.getColor() +
+                            "\n" + "описание: " + animal.getDescription(), MarkupsForInfo.photoBack(chat_id,
+                            Long.parseLong(call_split_data[3]), "back_from_animals_owner"));
+                }
+
+                case "back_from_animals_owner" -> {
+                    List<Animal> animals = sheltersService.getPageAnimals(page, size,
+                            Long.parseLong(call_split_data[2]), true);
+                    for(int mesId : statesStorage.getPhotosForDelete().get(chat_id)) {
+                        try {
+                            messageProvider.delMessage(chat_id, mesId);
+                        }catch (Exception e) {
+                            System.out.println(mesId);
+                        }
+                    }
+                    statesStorage.getPhotosForDelete().remove(chat_id);
+
+                    messageProvider.changeText(chat_id, messageId, "Ваши животные:");
+                    messageProvider.changeInline(chat_id, messageId,
+                            MarkupsForInfo.getAnimals(chat_id, messageId, page, animals,
+                                    Long.parseLong(call_split_data[2])));
+                }
+
                 case "click_on_shelter" -> {
                     messageProvider.delMessage(chat_id, messageId);
                     Shelters shelters = sheltersService.getShelterById(Long.parseLong(call_split_data[2]));
@@ -290,13 +393,37 @@ public class TelegramOwners {
                 }case "back_to_profile" -> {
                     messageProvider.delMessage(chat_id, messageId);
                     getInformation(chat_id);
+                } case "back_shelter_put_animal" -> {
+
+                    OwnerShelters ownerShelters = ownerSheltersService.getOwnerShelterByTelegramId(chat_id);
+                    if (ownerShelters == null) {
+                        messageProvider.PutMessage(chat_id, "вы не владелец приюта если хотите зарегистрировать" +
+                                "свой приют ведите команду /register_owner");
+                        return;
+                    }
+                    messageProvider.changeText(chat_id, messageId, "добро пожаловать " + ownerShelters.getName() +
+                            " выберете нужную команду");
+
+                    messageProvider.changeInline(chat_id, messageId, MarkupsForOwners.variantsForAdded(chat_id));
                 }case "info_on_shelter" -> {
                     List<Animal> animals = sheltersService.getPageAnimals(page, size,
-                            Long.parseLong(call_split_data[2]));
+                            Long.parseLong(call_split_data[2]), true);
                     messageProvider.changeText(chat_id, messageId, "Ваши животные:");
                     messageProvider.changeInline(chat_id, messageId,
                             MarkupsForInfo.getAnimals(chat_id, messageId, page, animals,
                                     Long.parseLong(call_split_data[2])));
+                }case "acceptV" -> {
+                    statesStorage.getUserStates().remove(chat_id);
+                    volunteersService.addVolunteers(statesStorage.getRegistrationDataVolunteers()
+                            .get(Long.parseLong(call_split_data[1])));
+                    messageProvider.PutMessage(Long.parseLong(call_split_data[1]), "вашу заявку приняли");
+                    messageProvider.delVolunteerMessage(call_split_data);
+                }case "rejectV" -> {
+                    statesStorage.getUserStates().remove(chat_id);
+                    messageProvider.PutMessage(chat_id,"напишите причину");
+                    statesStorage.ownerStatesPut(chat_id, OwnersStates.REJECT_VOLUNTEER);
+                    statesStorage.getVolunteerRejectedID().put(chat_id, Long.parseLong(call_split_data[1]));
+                    messageProvider.delVolunteerMessage(call_split_data);
                 }
             }
         }

@@ -39,7 +39,7 @@ public class SheltersService {
         return sheltersRepository.getSheltersById(id).orElse(null);
     }
 
-    public List<Animal> getPageAnimals(int page, int size, long id) {
+    public List<Animal> getPageAnimals(int page, int size, long id, boolean notReview) {
 
         if (page < 1) {
             log.error("Page number is less than 1");
@@ -50,7 +50,14 @@ public class SheltersService {
 
         if (shelter == null) return null;
 
-        List<Animal> animals = new ArrayList<>(shelter.getAnimals());
+        List<Animal> animals;
+
+        if (notReview) {
+            animals = shelter.getOnlyNotReviewedAnimals();
+        }else {
+            animals = shelter.getAnimals().stream().toList();
+        }
+
 
         int i = (page * size) - size;
 
@@ -96,5 +103,9 @@ public class SheltersService {
 
         return newShelters;
 
+    }
+
+    public List<Shelters> getSheltersByName(String name) {
+        return sheltersRepository.getSheltersByName(name);
     }
 }

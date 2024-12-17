@@ -3,7 +3,9 @@ package com.telegram.bot.telegram_utils;
 import com.telegram.bot.config.BotConfig;
 import com.telegram.bot.markUps.MarkupsForAdmins;
 import com.telegram.bot.models.Administrator;
+import com.telegram.bot.models.OwnerShelters;
 import com.telegram.bot.services.AdministratorService;
+import com.telegram.bot.services.SheltersService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -16,10 +18,9 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,16 +36,18 @@ public class MessageProvider extends TelegramLongPollingBot {
     private final StatesStorage statesStorage;
 
     private final MarkupsForAdmins markupsForAdmins;
+    private final SheltersService sheltersService;
 
     public MessageProvider(BotConfig config,
                            AdministratorService administratorService,
                            StatesStorage statesStorage,
-                           MarkupsForAdmins markupsForAdmins) {
+                           MarkupsForAdmins markupsForAdmins, SheltersService sheltersService) {
         super(config.getBotToken());
         this.config = config;
         this.administratorService = administratorService;
         this.statesStorage = statesStorage;
         this.markupsForAdmins = markupsForAdmins;
+        this.sheltersService = sheltersService;
     }
 
     /**
@@ -54,17 +57,19 @@ public class MessageProvider extends TelegramLongPollingBot {
      * @param message текст сообщения для отправки.
      * @throws RuntimeException если возникает ошибка API Telegram.
      */
-    public void PutMessage(long chatId, String message) {
+    public Message PutMessage(long chatId, String message) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId);
         sendMessage.setText(message);
 
+        Message mes = null;
         try {
-            execute(sendMessage);
+            mes = execute(sendMessage);
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
             throw new RuntimeException(e);
         }
+        return mes;
     }
 
     /**
@@ -81,13 +86,30 @@ public class MessageProvider extends TelegramLongPollingBot {
         for (Administrator admin : administratorService.getAllAdministrators()) {
             PutMessageForAdmins(admin.getTelegramId(),
                     "заявка от " + chatId + "\n" + message,
-                    markupsForAdmins.rejectAcceptMarkUp(chatId,
+                    MarkupsForAdmins.rejectAcceptMarkUp(chatId,
                             statesStorage.getCounterForDelMessage(), rejectQ, acceptQ), delMess);
         }
 
         statesStorage.delMessagesPut(statesStorage.getCounterForDelMessage(), delMess);
         statesStorage.incrementDelMessage();
     }
+
+    public void SendRegisterVolunteerToOwner(long chatId,long shelterId, String message,
+                                             String rejectQ, String acceptQ){
+        Map<Long, Integer> delMess = new ConcurrentHashMap<>();
+        List<OwnerShelters> ownerShelters = sheltersService.getShelterById(shelterId).
+                getOwnerShelters().stream().toList();
+        for (OwnerShelters ownerShelter : ownerShelters) {
+            PutMessageForAdmins(ownerShelter.getTelegramId(),
+                    "заявка от " + chatId + "\n" + message,
+                    MarkupsForAdmins.rejectAcceptMarkUp(chatId,
+                            statesStorage.getCounterForDelMessagesVolunteer(), rejectQ, acceptQ), delMess);
+        }
+
+        statesStorage.delMessagesVolunteersPut(statesStorage.getCounterForDelMessagesVolunteer(), delMess);
+        statesStorage.incrementDelMessagesVolunteer();
+    }
+
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -137,23 +159,33 @@ public class MessageProvider extends TelegramLongPollingBot {
      * @param message              текст сообщения, которое будет отправлено.
      * @param inlineKeyboardMarkup разметка кнопок, добавляемая к сообщению.
      */
-    public void PutMessageWithMarkUp(long chatId, String message, ReplyKeyboard inlineKeyboardMarkup) {
+    public Message PutMessageWithMarkUp(long chatId, String message, ReplyKeyboard inlineKeyboardMarkup) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId);
         sendMessage.setText(message);
         sendMessage.setParseMode(ParseMode.HTML);
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
 
+        Message message1;
         try {
-            execute(sendMessage);
+            message1 = execute(sendMessage);
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
             throw new RuntimeException(e);
         }
+        return message1;
     }
 
     public void delAdminMessage(String[] call_split_data) {
         Map<Long, Integer> delMess = statesStorage.getDelMessages().get(Integer.parseInt(call_split_data[2]));
+
+        for (Long key : delMess.keySet()) {
+            delMessage(key, delMess.get(key));
+        }
+    }
+
+    public void delVolunteerMessage(String[] call_split_data) {
+        Map<Long, Integer> delMess = statesStorage.getDelMessagesVolunteers().get(Integer.parseInt(call_split_data[2]));
 
         for (Long key : delMess.keySet()) {
             delMessage(key, delMess.get(key));
@@ -180,18 +212,21 @@ public class MessageProvider extends TelegramLongPollingBot {
         }
     }
 
-    public void changeInline(long chatID, int messageID, InlineKeyboardMarkup keyboardMarkup) {
+    public Message changeInline(long chatID, int messageID, InlineKeyboardMarkup keyboardMarkup) {
         EditMessageReplyMarkup editMessageReplyMarkup = new EditMessageReplyMarkup();
         editMessageReplyMarkup.setMessageId(messageID);
         editMessageReplyMarkup.setChatId(chatID);
         editMessageReplyMarkup.setReplyMarkup(keyboardMarkup);
 
+        Message message;
         try {
-            execute(editMessageReplyMarkup);
+            message = (Message) execute(editMessageReplyMarkup);
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
             throw new RuntimeException(e);
         }
+
+        return message;
     }
 
     public void changeText(long chatID, int messageID, String text){

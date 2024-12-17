@@ -5,6 +5,8 @@ import com.telegram.bot.models.TelegramUser;
 import com.telegram.bot.repositories.TelegramUsersRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class TelegramUsersService {
     private final TelegramUsersRepository telegramUsersRepository;
@@ -19,5 +21,9 @@ public class TelegramUsersService {
 
     public TelegramUser getByTgIdTelegramUser(long tgId) {
         return telegramUsersRepository.findByTelegramId(tgId).orElse(null);
+    }
+
+    public List<TelegramUser> getTelegramUsers() {
+        return telegramUsersRepository.findAll();
     }
 }

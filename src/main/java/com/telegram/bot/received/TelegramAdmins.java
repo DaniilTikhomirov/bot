@@ -2,7 +2,7 @@ package com.telegram.bot.received;
 
 import com.telegram.bot.services.OwnerSheltersService;
 import com.telegram.bot.states.AdministratorStates;
-import com.telegram.bot.states.UserStateRegisterOwner;
+import com.telegram.bot.states.UserState;
 import com.telegram.bot.telegram_utils.MessageProvider;
 import com.telegram.bot.telegram_utils.StatesStorage;
 import org.springframework.stereotype.Component;
@@ -39,7 +39,7 @@ public class TelegramAdmins {
         if (statesStorage.getAdministratorStates().get(chatId) == AdministratorStates.REJECTED_DESCRIPTION) {
             messageProvider.PutMessage(statesStorage.getAdministratorRejectedID().get(chatId), "ваша заявка отклонена \n описание: " + message);
             statesStorage.UserStatesPut(statesStorage.getAdministratorRejectedID().get(chatId),
-                    UserStateRegisterOwner.registrationOwnerDenied);
+                    UserState.registrationOwnerDenied);
             statesStorage.getAdministratorRejectedID().remove(chatId);
             statesStorage.getRegistrationDataOwner().remove(chatId);
         }
@@ -50,7 +50,7 @@ public class TelegramAdmins {
 
         switch (call_split_data[0]) {
             case "accept" -> {
-                statesStorage.UserStatesPut(id, UserStateRegisterOwner.registrationOwnerAccepted);
+                statesStorage.UserStatesPut(id, UserState.registrationOwnerAccepted);
                 messageProvider.PutMessage(id, "Вашу заявку приняли!");
                 ownerSheltersService.addOwnerShelter(statesStorage.getRegistrationDataOwner().get(id));
                 statesStorage.getRegistrationDataOwner().remove(id);

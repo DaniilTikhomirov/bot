@@ -3,6 +3,7 @@ package com.telegram.bot.services;
 import com.telegram.bot.config.BotConfig;
 import com.telegram.bot.telegram_utils.MessageProvider;
 import com.telegram.bot.telegram_utils.StatesStorage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
@@ -26,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
+@Slf4j
 public class PhotoManagerService extends TelegramLongPollingBot {
 
     private final StatesStorage statesStorage;
@@ -56,7 +58,6 @@ public class PhotoManagerService extends TelegramLongPollingBot {
         long chatId = update.getMessage().getChatId();
         List<PhotoSize> photos = update.getMessage().getPhoto();
 
-        System.out.println(photos.toString());
         if (!photos.isEmpty()) {
 
             PhotoSize photo = photos.stream()
@@ -80,7 +81,7 @@ public class PhotoManagerService extends TelegramLongPollingBot {
 
             } catch (TelegramApiException e) {
                 e.printStackTrace();
-                System.err.println("Error during file download: " + e.getMessage());
+                log.error("Error during file download: " + e.getMessage());
             }
         }
     }
@@ -101,7 +102,29 @@ public class PhotoManagerService extends TelegramLongPollingBot {
         List<Path> photos = getPhotosFromStructure(shelterId, animalId, startFile);
 
         if (photos == null || photos.isEmpty()) {
-            messageProvider.PutMessage(chat_id, "Фотографии отсутствуют");
+            Message message = messageProvider.PutMessage(chat_id, "Фотографии отсутствуют");
+            statesStorage.photosForDeleteAdd(chat_id, message.getMessageId());
+            return;
+        }
+
+        if(photos.size() < 2){
+            String filePath = photos.get(0).toString();
+            SendPhoto sendPhoto = new SendPhoto();
+            sendPhoto.setChatId(chat_id);
+
+            InputFile photoFile = new InputFile(new File(filePath));
+            sendPhoto.setPhoto(photoFile);
+
+            try {
+                // Отправляем фотографию
+                Message message = execute(sendPhoto);
+                statesStorage.photosForDeleteAdd(chat_id, message.getMessageId());
+
+                log.info("Фото отправлено успешно!");
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке фото: " + e.getMessage());
+            }
+
             return;
         }
 
@@ -112,7 +135,7 @@ public class PhotoManagerService extends TelegramLongPollingBot {
             File photoFile = path.toFile();
 
             if (!photoFile.exists() || !photoFile.isFile()) {
-                System.err.println("Файл не найден: " + path.toString());
+                log.error("Файл не найден: " + path.toString());
                 continue; // Пропускаем отсутствующие файлы
             }
 
@@ -144,10 +167,9 @@ public class PhotoManagerService extends TelegramLongPollingBot {
             for (Message message : messages) {
                 statesStorage.photosForDeleteAdd(chat_id, message.getMessageId());
             }
-            System.out.println("Группа фотографий отправлена успешно!");
+            log.info("Группа фотографий отправлена успешно!");
         } catch (TelegramApiException e) {
-            e.printStackTrace();
-            System.err.println("Ошибка при отправке группы фотографий: " + e.getMessage());
+            log.error("Ошибка при отправке группы фотографий: " + e.getMessage());
         }
     }
 

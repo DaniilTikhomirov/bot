@@ -9,7 +9,9 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Check;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Модель приюта.
@@ -59,4 +61,8 @@ public class Shelters {
     private Collection<OwnerShelters> ownerShelters;
 
     private String kind;
+
+    public List<Animal> getOnlyNotReviewedAnimals() {
+        return getAnimals().stream().filter(o -> (!o.isReview())).toList();
+    }
 }

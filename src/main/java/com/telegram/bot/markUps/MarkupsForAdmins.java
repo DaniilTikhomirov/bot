@@ -19,7 +19,7 @@ public class MarkupsForAdmins {
      * @param counter уникальный счетчик для отслеживания заявок.
      * @return объект {@link InlineKeyboardMarkup} с кнопками.
      **/
-    public InlineKeyboardMarkup rejectAcceptMarkUp(long chat_id, int counter, String rejectQ, String acceptQ) {
+    public static InlineKeyboardMarkup rejectAcceptMarkUp(long chat_id, int counter, String rejectQ, String acceptQ) {
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInlineKeyboardButtons = new ArrayList<>();

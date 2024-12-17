@@ -5,35 +5,31 @@ import com.telegram.bot.config.BotConfig;
 import com.telegram.bot.markUps.MarkupsForInfo;
 import com.telegram.bot.models.Shelters;
 import com.telegram.bot.models.TelegramUser;
+import com.telegram.bot.models.Volunteers;
 import com.telegram.bot.received.TelegramAdmins;
 import com.telegram.bot.received.TelegramOwners;
 import com.telegram.bot.received.TelegramUsers;
 import com.telegram.bot.markUps.MarkupsForOwners;
 import com.telegram.bot.models.OwnerShelters;
+import com.telegram.bot.received.TelegramVolunteers;
 import com.telegram.bot.services.*;
 import com.telegram.bot.states.AdministratorStates;
 import com.telegram.bot.states.OwnersStates;
-import com.telegram.bot.states.UserStateRegisterOwner;
+import com.telegram.bot.states.UserState;
 import com.telegram.bot.telegram_utils.MessageProvider;
 import com.telegram.bot.telegram_utils.StatesStorage;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
-import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 
@@ -47,7 +43,7 @@ import java.util.List;
  * <h3>Основные функции:</h3>
  * <ul>
  *     <li>Обработка входящих сообщений и команд (например, /start, /register_owner, /owner).</li>
- *     <li>Управление состоянием пользователей через {@link UserStateRegisterOwner}.</li>
+ *     <li>Управление состоянием пользователей через {@link UserState}.</li>
  *     <li>Регистрация заявок владельцев приютов с отправкой сообщений администраторам.</li>
  *     <li>Обработка решений администраторов (принятие или отклонение заявок).</li>
  *     <li>Удаление временных сообщений из чата для удобства.</li>
@@ -58,7 +54,7 @@ import java.util.List;
  *     <li>{@link BotConfig} — конфигурация для получения токена и имени бота.</li>
  *     <li>{@link OwnerSheltersService} — управление данными владельцев приютов.</li>
  *     <li>{@link AdministratorService} — управление данными администраторов.</li>
- *     <li>{@link UserStateRegisterOwner} — состояния пользователя при регистрации владельца приюта.</li>
+ *     <li>{@link UserState} — состояния пользователя при регистрации владельца приюта.</li>
  *     <li>{@link AdministratorStates} — состояния администратора при обработке заявок.</li>
  * </ul>
  *
@@ -76,7 +72,7 @@ import java.util.List;
  * <p>Класс скрыт от документации Swagger с помощью аннотации {@link Hidden}.</p>
  *
  * @see TelegramLongPollingBot
- * @see UserStateRegisterOwner
+ * @see UserState
  * @see AdministratorStates
  */
 @Slf4j
@@ -106,6 +102,8 @@ public class TelegramPetBot extends TelegramLongPollingBot {
 
     private final TelegramUsersService telegramUsersService;
     private final SheltersService sheltersService;
+    private final VolunteersService volunteersService;
+    private final TelegramVolunteers telegramVolunteers;
 
     public TelegramPetBot(BotConfig config,
                           OwnerSheltersService ownerSheltersService,
@@ -117,7 +115,7 @@ public class TelegramPetBot extends TelegramLongPollingBot {
                           TelegramOwners telegramOwners,
                           CallBack callBack,
                           PhotoManagerService photoManagerService,
-                          TelegramUsersService telegramUsersService, SheltersService sheltersService) {
+                          TelegramUsersService telegramUsersService, SheltersService sheltersService, VolunteersService volunteersService, TelegramVolunteers telegramVolunteers) {
         super(config.getBotToken());
         this.config = config;
         this.statesStorage = statesStorage;
@@ -131,6 +129,8 @@ public class TelegramPetBot extends TelegramLongPollingBot {
         this.photoManagerService = photoManagerService;
         this.telegramUsersService = telegramUsersService;
         this.sheltersService = sheltersService;
+        this.volunteersService = volunteersService;
+        this.telegramVolunteers = telegramVolunteers;
     }
 
     /**
@@ -157,12 +157,20 @@ public class TelegramPetBot extends TelegramLongPollingBot {
 
             telegramUsers.receivedStateUser(chatId, message);
 
+            if(!acceptReceived(chatId)){
+                return;
+            }
+
             telegramAdmins.receivedStateAdmin(chatId, message);
 
             telegramOwners.receivedStateOwner(chatId, message);
 
+            telegramVolunteers.receivedStateVolunteers(chatId, message, messageId);
+
 
             switch (message) {
+
+
                 case "/start" -> {
                     StartMessage(chatId, update.getMessage().getChat().getFirstName());
                     if (telegramUsersService.getByTgIdTelegramUser(chatId) == null) {
@@ -174,31 +182,48 @@ public class TelegramPetBot extends TelegramLongPollingBot {
                 }
 
                 case "/owner" -> {
-                    OwnerMessage(chatId);
+                     statesStorage.removeChatId(chatId);
+                     OwnerMessage(chatId);
                 }
 
                 case "/owner_info" -> {
+                    statesStorage.removeChatId(chatId);
                     telegramOwners.getInformation(chatId);
                 }
 
                 case "/register_owner" -> {
+                    statesStorage.getUserStates().remove(chatId);
                     RegistrationOwnerMessage(chatId);
                 }
 
                 case "/info" -> {
+                    statesStorage.removeChatId(chatId);
                     messageProvider.PutMessage(chatId, "дополнить");
                 }
 
                 case "/help" -> {
+                    statesStorage.removeChatId(chatId);
                     messageProvider.PutMessage(chatId, "дополнить");
                 }
 
                 case "/shelters" -> {
+                    statesStorage.removeChatId(chatId);
                     List<Shelters> shelters = sheltersService.getPageAllShelters(1, 5);
 
                     messageProvider.PutMessageWithMarkUp(chatId, "Все приюты:",
                             MarkupsForInfo.getInfoAllShelters(chatId, messageId,
                                     1, shelters, false));
+                }
+
+                case "/register_volunteer" -> {
+                    statesStorage.removeChatId(chatId);
+                    RegisterVolunteerMessage(chatId);
+                }
+
+                case "/my_info" -> {
+                    statesStorage.removeChatId(chatId);
+                    myInfoMessage(chatId);
+
                 }
 
                 case "сохранить фотографии" -> {
@@ -249,8 +274,56 @@ public class TelegramPetBot extends TelegramLongPollingBot {
             messageProvider.PutMessage(chatId,
                     "вы уже владелец приюта информацию можете узнать по команде /owner");
         } else {
-            statesStorage.UserStatesPut(chatId, UserStateRegisterOwner.registrationOwner);
+            statesStorage.UserStatesPut(chatId, UserState.registrationOwner);
             messageProvider.PutMessage(chatId, "напишите пожалуйста ваше имя не указывайте в имени '/'");
+        }
+    }
+
+    private boolean acceptReceived(long chatId) {
+        if(statesStorage.getUserStates().get(chatId) == UserState.WAIT_ANIMAL_ACCEPTED){
+            messageProvider.PutMessage(chatId, "Отправте заявку на потверждение состояния животного");
+            return false;
+        }
+        return true;
+    }
+
+    private void myInfoMessage(long chatId) {
+        StringBuilder info = new StringBuilder();
+        StringBuilder roles = new StringBuilder();
+        TelegramUser telegramUser = telegramUsersService.getByTgIdTelegramUser(chatId);
+        if (telegramUser == null) {
+            messageProvider.PutMessage(chatId,"возникла ошибка попробуйте /start");
+            return;
+        }
+
+        info.append("ID: ").append(telegramUser.getTelegramId()).append("\n");
+        roles.append("роли: Пользователь");
+
+        OwnerShelters ownerShelters = ownerSheltersService.getOwnerShelterByTelegramId(chatId);
+        if (ownerShelters != null) {
+            info.append("Количество приютов: ").append(ownerShelters.getShelters().size()).append("\n");
+            info.append("Количество животных: ").append(ownerShelters.countAnimals()).append("\n");
+            roles.append(", Владелец приюта");
+
+        }
+
+        Volunteers volunteers = volunteersService.getVolunteerByTelegramId(chatId);
+
+        if(volunteers != null){
+            roles.append(", Волонтер");
+        }
+
+        info.append(roles);
+
+        messageProvider.PutMessage(chatId, info.toString());
+    }
+
+    private void RegisterVolunteerMessage(long chatId) {
+        if(volunteersService.isVolunteer(chatId)){
+            messageProvider.PutMessage(chatId,"Вы уже являетесь волонтером");
+        }else {
+            statesStorage.UserStatesPut(chatId, UserState.registrationVolunteerName);
+            messageProvider.PutMessage(chatId, "напишите ваше имя");
         }
     }
 
@@ -262,7 +335,7 @@ public class TelegramPetBot extends TelegramLongPollingBot {
                     "свой приют ведите команду /register_owner");
         } else {
             messageProvider.PutMessageWithMarkUp(chatId, "добро пожаловать " + ownerShelters.getName() +
-                    " выберете нужную команду", markupsForOwners.variantsForAdded(chatId));
+                    " выберете нужную команду", MarkupsForOwners.variantsForAdded(chatId));
         }
     }
 

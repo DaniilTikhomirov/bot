@@ -6,6 +6,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 /**
  * Модель волонтёра для приютов.
  * Поле <b>shelters</b> представляет связь {@link ManyToOne} с классом {@link Shelters},
@@ -34,6 +36,12 @@ public class Volunteers {
 
     private String description;
 
+    @Column(name = "telegram_id")
+    private long telegramId;
+
     @Column(nullable = false)
     private String contact;
+
+    @OneToMany(mappedBy = "volunteer", fetch = FetchType.EAGER)
+    private List<TelegramUser> users;
 }
